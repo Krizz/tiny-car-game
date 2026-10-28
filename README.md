@@ -10,21 +10,14 @@ Requirements: [Docker](https://docs.docker.com/get-docker/) — nothing else.
 ./start.sh /path/to/GAME.CUE ./game-data     # converts your game once, then starts the server
 ```
 
-Then open **http://localhost** in a browser (or the address `start.sh` prints — players on your network or
-over the internet use the addresses below it):
+Open **http://localhost** to play. To invite friends, send them the address `start.sh` prints:
 
 ```
-Server is running (game-server).
-  this computer:    http://localhost
-  local network:    http://192.168.1.20
+  local network:    http://192.168.1.20      (example addresses)
   internet:         http://203.0.113.10
-                    (for players outside your network, forward TCP 80 and UDP 7903 on your router to 192.168.1.20)
-  fast UDP channel: works at 203.0.113.10 192.168.1.20 (UDP 7903)
 ```
 
-**Invite your friends:** send them the local network address (same Wi-Fi or LAN) or the internet one. They
-just open it in their browser — no install, no account — pick a name and a car, and join the next race.
-Computer drivers fill the empty grid slots, so a race is on even with only two of you.
+They need only a browser.
 
 Stop it with `./stop.sh`.
 
