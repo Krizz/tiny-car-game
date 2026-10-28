@@ -347,7 +347,8 @@ def main():
         elif cue:
             say(f"music from {os.path.basename(cue)}")
         else:
-            say("music: none — no .cue with CD audio found next to the input (a plain .iso holds no music)")
+            say("music: none — " + ("an installed game has no CD music (give the disc's .cue + .bin to include it)" if not image
+                else "no .cue with CD audio found next to the input (a plain .iso holds no music)"))
 
         # 2. is it all there?
         want = levels()
