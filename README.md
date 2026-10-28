@@ -1,4 +1,6 @@
-# Browser multiplayer for Re-Volt (1999) — from your own disc
+# Browser-based multiplayer for Re-Volt (1999) — from your own disc
+
+![A race in Toy World 1, in the browser](docs/screenshot.webp)
 
 An unofficial browser racing engine and server: up to 16 players race in the browser, with
 computer drivers filling the grid, all 13 tracks forwards / reversed / mirrored, the original cars,
