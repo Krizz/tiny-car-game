@@ -2,6 +2,34 @@
 
 ![A race in Toy World 1, in the browser](docs/screenshot.webp)
 
+## Quick start
+
+Requirements: [Docker](https://docs.docker.com/get-docker/) — nothing else.
+
+```bash
+./start.sh /path/to/GAME.CUE ./game-data     # converts your game once, then starts the server
+```
+
+Then open **http://localhost** in a browser (or the address `start.sh` prints — players on your network or
+over the internet use the addresses below it):
+
+```
+Server is running (game-server).
+  this computer:    http://localhost
+  local network:    http://192.168.1.20
+  internet:         http://203.0.113.10
+                    (for players outside your network, forward TCP 80 and UDP 7903 on your router to 192.168.1.20)
+  fast UDP channel: works at 203.0.113.10 192.168.1.20 (UDP 7903)
+```
+
+**Invite your friends:** send them the local network address (same Wi-Fi or LAN) or the internet one. They
+just open it in their browser — no install, no account — pick a name and a car, and join the next race.
+Computer drivers fill the empty grid slots, so a race is on even with only two of you.
+
+Stop it with `./stop.sh`.
+
+## What it is
+
 An unofficial browser racing engine and server: up to 16 players race in the browser, with
 computer drivers filling the grid, all 13 tracks forwards / reversed / mirrored, the original cars,
 weapons and pickups. Keyboard, gamepad or touch.
@@ -17,16 +45,9 @@ with or endorsed by the game's rights holders.
 own compatible game data (a PC disc image or an installed game). `start.sh` converts it on your machine and
 starts a server for you and your friends.
 
-## Quick start
+## Your game data
 
-Requirements: [Docker](https://docs.docker.com/get-docker/) — nothing else.
-
-```bash
-./start.sh /path/to/GAME.CUE ./game-data     # converts once, then starts the server
-./stop.sh
-```
-
-The first argument is your game, in any of these forms:
+The first argument to `start.sh` is your game, in any of these forms:
 - a `.cue` with its `.bin` — includes the CD music
 - a `.bin` / `.img` (raw CD image) or `.iso` — an `.iso` has no music unless a `.cue` + `.bin` sit next to it
 - a folder: an installed game, a copied or mounted CD, or a folder with a disc image in it (also a
@@ -34,23 +55,12 @@ The first argument is your game, in any of these forms:
 - an archive (`.7z`, `.zip`, `.rar`) holding any of these, as disc images are often downloaded — it is
   unpacked inside the container
 
-Checked with the French PC release (one `.bin` + `.cue`, and the `.iso` alone) and the US release as
-preserved by Redump (a `.cue` with one `.bin` per track, as the `.7z`, unpacked and in a subfolder):
-the same tracks, cars and textures come out of both.
-
 The second is where the converted game goes (~100–150 MB). A second start with the same input skips the
 conversion and takes seconds.
 
-`start.sh` then prints where to open the game:
-
-```
-Server is running (game-server).
-  this computer:    http://localhost
-  local network:    http://192.168.1.20
-  internet:         http://203.0.113.10
-                    (for players outside your network, forward TCP 80 and UDP 7903 on your router to 192.168.1.20)
-  fast UDP channel: works at 203.0.113.10 192.168.1.20 (UDP 7903)
-```
+Checked with the French PC release (one `.bin` + `.cue`, and the `.iso` alone) and the US release as
+preserved by Redump (a `.cue` with one `.bin` per track, as the `.7z`, unpacked and in a subfolder):
+the same tracks, cars and textures come out of both.
 
 ## What it works out by itself
 
