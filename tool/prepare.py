@@ -3,6 +3,7 @@
 Runs inside the tool image (tool/Dockerfile; start.sh calls it). Python stdlib + 7z + ffmpeg.
   prepare.py <input> [--rebuild] [--no-music]
 <input> is any of:
+  - an archive (.7z, .zip, .rar — by its contents) holding any of the below: unpacked first
   - a disc image: .cue (+ its .bin), .bin/.img (raw 2352-byte sectors), .iso (2048-byte sectors) — told
     apart by where the ISO 9660 signature sits, not by the name. A .cue next to an .iso/.bin is used
     for the music (the CD audio tracks are only in a raw image).
@@ -120,6 +121,30 @@ def game_root(top, depth=4):
     return None
 
 
+ARCHIVES = {b"7z\xbc\xaf\x27\x1c": "7z", b"PK\x03\x04": "zip", b"Rar!\x1a\x07": "rar"}
+
+
+def archive_kind(path):
+    """'7z' / 'zip' / 'rar' by the file's first bytes (not its name), else None."""
+    with open(path, "rb") as f:
+        head = f.read(8)
+    return next((k for sig, k in ARCHIVES.items() if head.startswith(sig)), None)
+
+
+def seven_zip():
+    return shutil.which("7zz") or shutil.which("7z") or "7z"  # Debian's 7zip package calls it 7zz
+
+
+def walk(top, depth):
+    """os.walk, at most `depth` folders down."""
+    base = top.rstrip("/").count("/")
+    for r, ds, fs in os.walk(top):
+        if r.count("/") - base >= depth:
+            ds[:] = []
+        ds.sort()
+        yield r, ds, sorted(fs)
+
+
 # ------------------------------------------------------------------ disc images
 
 def sector_layout(path):
@@ -189,8 +214,7 @@ def extract_data(image, layout, work):
                     break
                 o.write(s[off:off + 2048])
     dest = os.path.join(work, "disc")
-    seven = shutil.which("7zz") or shutil.which("7z") or "7z"  # Debian's 7zip package calls it 7zz
-    r = subprocess.run([seven, "x", "-y", f"-o{dest}", iso], capture_output=True, text=True)
+    r = subprocess.run([seven_zip(), "x", "-y", f"-o{dest}", iso], capture_output=True, text=True)
     if r.returncode != 0:
         fail(f"could not read the disc's files (7z: {r.stderr.strip() or r.stdout.strip()[-300:]})")
     return dest
@@ -274,20 +298,30 @@ def main():
     try:
         # 1. find the game's files and the music
         cue = None
-        if os.path.isdir(INPUT):
-            root = game_root(INPUT)
+        src = INPUT
+        kind = archive_kind(src) if os.path.isfile(src) else None
+        if kind:
+            # a downloaded archive (.7z / .zip / .rar): unpacked here, then searched like a folder
+            say(f"{kind} archive: unpacking…")
+            src = os.path.join(work, "archive")
+            r = subprocess.run([seven_zip(), "x", "-y", f"-o{src}", INPUT], capture_output=True, text=True)
+            if r.returncode != 0:
+                fail(f"could not unpack {os.path.basename(INPUT)} (7z: {(r.stderr or r.stdout).strip()[-300:]})")
+        if os.path.isdir(src):
+            root = game_root(src)
             if not root:
-                # a folder holding a disc image
-                imgs = sorted(os.path.join(INPUT, n) for n in os.listdir(INPUT)
-                              if os.path.isfile(os.path.join(INPUT, n)) and sector_layout(os.path.join(INPUT, n)))
+                # a folder holding a disc image (also one level or two down, as archives often have it)
+                imgs = [os.path.join(r, n) for r, _, fs in walk(src, 3) for n in fs if sector_layout(os.path.join(r, n))]
                 if not imgs:
-                    fail(f"no compatible game folder (levels/, cars/, wavs/) or disc image found in {INPUT}")
+                    fail(f"no compatible game folder (levels/, cars/, wavs/) or disc image found in {os.path.basename(INPUT.rstrip('/'))}")
                 image = max(imgs, key=os.path.getsize)
-                say(f"found the disc image {os.path.basename(image)}")
+                say(f"found the disc image {os.path.relpath(image, src)}")
+                cue = find_cue(os.path.dirname(image), os.path.splitext(os.path.basename(image))[0])
             else:
                 image = None
-                say(f"game folder: {os.path.relpath(root, INPUT) if root != INPUT else '.'}")
-            cue = find_cue(INPUT)
+                say(f"game folder: {os.path.relpath(root, src) if root != src else '.'}")
+                cue = None
+            cue = cue or next((c for r, _, _ in walk(src, 3) for c in [find_cue(r)] if c), None)
         else:
             image = INPUT
             if INPUT.lower().endswith(".cue"):
@@ -347,7 +381,7 @@ def main():
         tracks = music(cue, os.path.join(new, "music")) if cue else 0
         say(f"  sound effects as Opus: {opus(new)}")
         # the levels' names as the game shows them
-        names, from_exe = level_names(want, root, [root] + ([os.path.dirname(root)] if image else [INPUT]))
+        names, from_exe = level_names(want, root, [root] + ([os.path.dirname(root)] if image else [src]))
         json.dump(names, open(os.path.join(new, "levels.json"), "w"), indent=1, ensure_ascii=False)
         say(f"  level names: {from_exe} of {len(want)} from the game's exe" + ("" if from_exe == len(want) else ", the rest from the levels' .inf files"))
         # 4. the CPU drivers' training (this project's own files, in the image)

@@ -29,7 +29,14 @@ Requirements: [Docker](https://docs.docker.com/get-docker/) — nothing else.
 The first argument is your game, in any of these forms:
 - a `.cue` with its `.bin` — includes the CD music
 - a `.bin` / `.img` (raw CD image) or `.iso` — an `.iso` has no music unless a `.cue` + `.bin` sit next to it
-- a folder: an installed game, a copied or mounted CD, or a folder with a disc image in it
+- a folder: an installed game, a copied or mounted CD, or a folder with a disc image in it (also a
+  folder or two down)
+- an archive (`.7z`, `.zip`, `.rar`) holding any of these, as disc images are often downloaded — it is
+  unpacked inside the container
+
+Checked with the French PC release (one `.bin` + `.cue`, and the `.iso` alone) and the US release as
+preserved by Redump (a `.cue` with one `.bin` per track, as the `.7z`, unpacked and in a subfolder):
+the same tracks, cars and textures come out of both.
 
 The second is where the converted game goes (~100–150 MB). A second start with the same input skips the
 conversion and takes seconds.

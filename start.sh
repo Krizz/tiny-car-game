@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Turn your own compatible game disc into a browser multiplayer server, and start it. Only Docker is needed.
 #   ./start.sh <disc image or game folder> <output folder> [--rebuild] [--no-music] [--fg]
-#     disc image: .cue (with its .bin — has the music), .bin, .iso (no music); or a game/CD folder
+#     disc image: .cue (with its .bin files — has the music), .bin, .iso (no music); a game/CD folder;
+#     or a .7z / .zip / .rar holding any of these
 #     output folder: where the converted game goes (≈130 MB); reused next time, so a second start is quick
 #   --rebuild    convert again even if the output folder is up to date
 #   --no-music   leave the CD music out
