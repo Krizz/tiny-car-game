@@ -1,0 +1,11 @@
+# tool/Dockerfile's build context is the repository: only code goes in, never the game's files
+**
+!src
+!convert/convert.py
+!tool
+src/node_modules
+src/dist
+src/data
+src/test/out
+src/public/game/**
+!src/public/game/*/ai-*.json

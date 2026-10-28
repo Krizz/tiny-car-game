@@ -1,0 +1,25 @@
+# local credentials and agent configuration
+.env
+.env.*
+!.env.example
+.aws/
+.codex/
+.agents/
+
+# never commit the game's files: only the computer drivers' training files live under public/game
+src/public/game/**
+!src/public/game/*/
+!src/public/game/*/ai-*.json
+src/node_modules/
+src/dist/
+src/data/
+src/test/out/
+build-wasm/
+__pycache__/
+# start.sh output folders, disc images and game folders, if kept here
+*.iso
+*.bin
+*.cue
+*.img
+game-data/
+*-game/

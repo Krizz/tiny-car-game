@@ -1,0 +1,23 @@
+{
+  "name": "cargame",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "start": "bun run server.ts",
+    "watch": "vite build --watch"
+  },
+  "dependencies": {
+    "node-datachannel": "0.33.4",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.170.0",
+    "bun-types": "1.3.0",
+    "typescript": "5.7.2",
+    "vite": "6.0.7"
+  },
+  "trustedDependencies": [
+    "node-datachannel"
+  ]
+}
