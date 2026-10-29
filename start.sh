@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Turn your own compatible game disc into a browser multiplayer server, and start it. Only Docker is needed.
-#   ./start.sh <disc image or game folder> <output folder> [--rebuild] [--no-music] [--fg]
+#   ./start.sh <disc image or game folder> <output folder> [--rebuild] [--no-music] [--public] [--fg]
 #     disc image: .cue (with its .bin files — has the music), .bin, .iso (no music); a game/CD folder;
 #     or a .7z / .zip / .rar holding any of these
 #     output folder: where the converted game goes (≈130 MB); reused next time, so a second start is quick
 #   --rebuild    convert again even if the output folder is up to date
 #   --no-music   leave the CD music out
+#   --public     give it an https address anyone on the internet can open, through a Cloudflare
+#                quick tunnel (no account, no router setup; a new address every start; car states
+#                go over TCP there unless UDP is forwarded too)
 #   --fg         run in this terminal (Ctrl+C stops it) instead of in the background
 # Settings (environment), all optional:
 #   PORT=80          web port (the next free one is taken if it is busy)
@@ -19,19 +22,23 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 NAME=${NAME:-game-server}
 IMAGE=${IMAGE:-game-server}
+TUNNEL_IMAGE=${TUNNEL_IMAGE:-cloudflare/cloudflared:2026.8.2}
+TNAME=$NAME-tunnel NET=$NAME-net
 die() { echo "error: $*" >&2; exit 1; }
 
-input='' out='' fg=0 pflags=()
+usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; }
+input='' out='' fg=0 tunnel=0 pflags=()
 for a in "$@"; do
   case "$a" in
     --rebuild|--no-music) pflags+=("$a") ;;
     --fg) fg=1 ;;
-    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --public) tunnel=1 ;;
+    -h|--help) usage; exit 0 ;;
     -*) die "unknown option $a (see ./start.sh --help)" ;;
     *) if [ -z "$input" ]; then input=$a; elif [ -z "$out" ]; then out=$a; else die "too many arguments"; fi ;;
   esac
 done
-[ -n "$input" ] && [ -n "$out" ] || { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+[ -n "$input" ] && [ -n "$out" ] || { usage; exit 1; }
 [ -e "$input" ] || die "$input not found"
 
 command -v docker >/dev/null || die "Docker is needed: https://docs.docker.com/get-docker/"
@@ -54,11 +61,13 @@ echo "• preparing the game from $(basename "$input")"
 docker run --rm --user "$user" -v "$indir":/in:ro -v "$out":/out "$IMAGE" prepare "$inarg" ${pflags[@]+"${pflags[@]}"} \
   | sed 's/^/    /' || die "preparing the game failed"
 
-# an older server of the same name goes first (it may hold the ports)
+# an older server of the same name goes first (it may hold the ports), and its tunnel
 if docker container inspect "$NAME" >/dev/null 2>&1; then
   echo "• stopping the server already running as $NAME"
   docker rm -f "$NAME" >/dev/null
 fi
+docker rm -f "$TNAME" >/dev/null 2>&1 || true
+docker network inspect "$NET" >/dev/null 2>&1 || docker network create "$NET" >/dev/null
 
 # free ports: the first that Docker can publish, from the asked one up
 free() { # <port> <tcp|udp>
@@ -92,12 +101,38 @@ fi
 ips=$(printf '%s\n' "$pub" "$lan" | grep . | awk '!seen[$0]++' | paste -sd, -)
 [ -n "$ips" ] || echo "    warning: no address found for the fast channel; set PUBLIC_IP / LAN_IP (players will use the slower TCP fallback)"
 
-run=(--name "$NAME" --user "$user" -p "$port:8080" -p "$udp:$udp/udp"
+# the quick tunnel: Cloudflare hands out a random https address that leads to the server by its name
+# on the shared network; it is printed in the tunnel's log once the connection is up
+tunnel_url=''
+start_tunnel() { # <docker run flags>
+  echo "• opening a public address (Cloudflare quick tunnel)"
+  docker image inspect "$TUNNEL_IMAGE" >/dev/null 2>&1 || docker pull -q "$TUNNEL_IMAGE" >/dev/null 2>&1 || true
+  docker run -d "$@" --name "$TNAME" --network "$NET" "$TUNNEL_IMAGE" \
+    tunnel --no-autoupdate --url "http://$NAME:8080" >/dev/null || { echo "    warning: the tunnel did not start"; return; }
+  local l=''
+  for _ in $(seq 40); do
+    l=$(docker logs "$TNAME" 2>&1 || true)
+    tunnel_url=$(printf '%s\n' "$l" | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | head -1 || true)
+    [ -n "$tunnel_url" ] && printf '%s\n' "$l" | grep -q 'Registered tunnel connection' && return
+    sleep 1
+  done
+  tunnel_url=''
+  printf '%s\n' "$l" | tail -5 | sed 's/^/    /'
+  echo "    warning: the tunnel gave no address (see docker logs $TNAME); the server runs without it"
+}
+
+run=(--name "$NAME" --init --user "$user" --network "$NET" -p "$port:8080" -p "$udp:$udp/udp"
   -e RTC_PORT="$udp" -e RTC_PUBLIC_IP="$ips" -v "$out":/out)
 [ -n "${AI_RACERS:-}" ] && run+=(-e AI_RACERS="$AI_RACERS")
 if [ "$fg" = 1 ]; then
+  if [ "$tunnel" = 1 ]; then
+    trap 'rm -f "$log"; docker rm -f "$TNAME" >/dev/null 2>&1 || true' EXIT
+    start_tunnel
+    [ -n "$tunnel_url" ] && echo "  play and share:     $tunnel_url"
+  fi
   echo "• starting on port $port (Ctrl+C stops it)"
-  exec docker run --rm -it "${run[@]}" "$IMAGE" serve
+  docker run --rm -it "${run[@]}" "$IMAGE" serve || true
+  exit 0
 fi
 docker run -d --restart unless-stopped "${run[@]}" "$IMAGE" serve >/dev/null
 
@@ -110,6 +145,8 @@ for _ in $(seq 30); do
   sleep 1
 done
 
+[ "$tunnel" = 1 ] && start_tunnel --restart unless-stopped
+
 # the fast channel: from another container, through the published port, at each address
 udp_ok=''
 for ip in $(echo "$ips" | tr , ' '); do
@@ -121,18 +158,26 @@ done
 url() { [ "$port" = 80 ] && echo "http://$1" || echo "http://$1:$port"; }
 echo
 echo "Server is running ($NAME)."
-echo "  this computer:    $(url localhost)"
-[ -n "$lan" ] && [ "$lan" != "$pub" ] && echo "  local network:    $(url "$lan")"
-if [ -n "$pub" ]; then
-  echo "  internet:         $(url "$pub")"
+[ -z "$tunnel_url" ] && echo "  this computer:      $(url localhost)"
+[ -z "$tunnel_url" ] && [ -n "$lan" ] && [ "$lan" != "$pub" ] && echo "  local network:      $(url "$lan")"
+if [ -n "$tunnel_url" ]; then
+  echo "  play and share:     $tunnel_url"
+  echo "                      (open it yourself and send it to your friends; a new link every start,"
+  echo "                       or when the tunnel restarts: docker logs $TNAME 2>&1 | grep trycloudflare)"
+elif [ -n "$pub" ]; then
+  echo "  internet:           $(url "$pub")"
   if [ -n "$lan" ] && [ "$lan" != "$pub" ]; then
-    echo "                    (for players outside your network, forward TCP $port and UDP $udp on your router to $lan)"
+    echo "                      (for players outside your network, forward TCP $port and UDP $udp on your router to $lan)"
   fi
 fi
 if [ -n "$udp_ok" ]; then
-  echo "  fast UDP channel: works at$udp_ok (UDP $udp)"
+  echo "  fast UDP channel:   works at$udp_ok (UDP $udp)"
 else
-  echo "  fast UDP channel: could not be reached here — players still race over TCP, with more jitter"
-  echo "                    (is UDP $udp open in a firewall? set PUBLIC_IP / LAN_IP if the address is wrong)"
+  echo "  fast UDP channel:   could not be reached here — players still race over TCP, with more jitter"
+  if [ -n "$tunnel_url" ]; then
+    echo "                      (the tunnel carries only TCP; forward UDP $udp on your router to $lan for it)"
+  else
+    echo "                      (is UDP $udp open in a firewall? set PUBLIC_IP / LAN_IP if the address is wrong)"
+  fi
 fi
-echo "  stop:             NAME=$NAME ./stop.sh    logs: docker logs -f $NAME"
+echo "  stop:               NAME=$NAME ./stop.sh    logs: docker logs -f $NAME"

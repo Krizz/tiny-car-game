@@ -7,17 +7,23 @@
 Requirements: [Docker](https://docs.docker.com/get-docker/) — nothing else.
 
 ```bash
-./start.sh /path/to/GAME.CUE ./game-data     # converts your game once, then starts the server
+./start.sh /path/to/GAME.CUE ./game-data --public     # converts your game once, then starts the server
 ```
 
-Open **http://localhost** to play. To invite friends, send them the address `start.sh` prints:
+Once it is up, it prints a link:
 
 ```
-  local network:    http://192.168.1.20      (example addresses)
-  internet:         http://203.0.113.10
+  play and share:     https://lucky-river-garden-maple.trycloudflare.com    (example: yours will differ)
 ```
 
-They need only a browser.
+Open it yourself and send it to your friends: everyone plays at the same address, in a browser.
+`--public` is what makes it (a free Cloudflare quick tunnel: no router setup, no account). It changes on
+every start, so send the new one each time.
+
+The tunnel carries only TCP, so players who come through it race over the web socket (a little more
+jitter) unless UDP is reachable too. Without `--public`, `start.sh` prints your own addresses instead
+(`http://localhost` on this computer, `http://192.168.1.20` on the local network, your public IP with
+the ports forwarded on your router).
 
 Stop it with `./stop.sh`.
 
@@ -69,9 +75,10 @@ the same tracks, cars and textures come out of both.
 ## Options
 
 ```
-./start.sh <input> <output folder> [--rebuild] [--no-music] [--fg]
+./start.sh <input> <output folder> [--rebuild] [--no-music] [--public] [--fg]
   --rebuild    convert again even if the output folder is up to date
   --no-music   leave the CD music out
+  --public     an https address on the internet through a Cloudflare quick tunnel
   --fg         run in this terminal (Ctrl+C stops it) instead of in the background
 
 PORT=8080 UDP_PORT=7910 ./start.sh …     other ports (the next free one is taken if busy)
@@ -80,7 +87,9 @@ AI_RACERS=6                               computer drivers fill the grid up to t
 NAME=game-server-2                        a second server (with its own output folder); NAME=… ./stop.sh
 ```
 
-The server runs in the background and restarts with Docker. Logs: `docker logs -f game-server`.
+The server runs in the background and restarts with Docker. Logs: `docker logs -f game-server`. With
+`--public` the tunnel runs beside it as `game-server-tunnel`; if it restarts, its new address is in
+`docker logs game-server-tunnel`.
 Player laps that beat the computer drivers are kept in `<output folder>/laps/`.
 
 In the game: `?offline` free practice without the server, `?car=<key>` start car, `?bot=1` self-driving
@@ -97,6 +106,7 @@ In the game: `?offline` free practice without the server, `?car=<key>` start car
   Computer drivers are simulated on the server. Car states travel over a WebRTC data channel (UDP), the
   rest over a WebSocket.
 - `tool/udpcheck.ts` — opens a data channel to the server through the published port, to check it.
+- `--public` runs Cloudflare's `cloudflared` image as a quick tunnel to the server.
 
 ## Development
 
@@ -125,6 +135,7 @@ Supply game data you are authorized to use; this project's licence does not gran
 
 This is meant for players who own the game. A running server hands the converted game files to everyone
 who opens it, so if you host one, you are responsible for who can reach it: keep it to your own network,
-or to friends who own the game.
+or to friends who own the game. A `--public` address can be opened by anyone who has it; share it only
+with them.
 
 This project's code: MIT licence (`LICENSE`). Box3D © Erin Catto, MIT licence (`box3d/LICENSE`).
