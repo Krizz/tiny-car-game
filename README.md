@@ -10,6 +10,8 @@ Requirements: [Docker](https://docs.docker.com/get-docker/) — nothing else.
 ./start.sh /path/to/GAME.CUE ./game-data --public     # converts your game once, then starts the server
 ```
 
+![start.sh converting a disc image and starting a public server](docs/start.gif)
+
 Once it is up, it prints a link:
 
 ```
