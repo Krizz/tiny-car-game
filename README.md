@@ -1,6 +1,6 @@
 # Browser-based multiplayer for Re-Volt (1999) — from your own disc
 
-![A race in Toy World 1, in the browser](docs/screenshot.webp)
+[![140 computer drivers off the castle jump in Toy World 1, in the browser](docs/demo.webp)](docs/demo.mp4)
 
 ## Quick start
 
